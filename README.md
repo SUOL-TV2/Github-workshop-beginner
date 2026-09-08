@@ -63,3 +63,30 @@ See the [evaluator documentation](./docs/evaluator.md) for usage, arguments, eva
 
 In this repository we aim to have an application residing in the src folder. Here you can find a description of it and functional requirements.
 
+## Application development
+
+The game runs entirely in the browser and uses Node.js for local development tooling. Install Node.js 20 or newer, then install the project dependencies:
+
+```bash
+npm install
+```
+
+Start the local development server:
+
+```bash
+npm run dev
+```
+
+Open the URL shown by Vite (usually [http://localhost:5173](http://localhost:5173)) in a browser.
+
+Create a production build with:
+
+```bash
+npm run build
+```
+
+Run the automated tests with:
+
+```bash
+npm test
+```
