@@ -41,9 +41,9 @@
   <!-- bar bg -->
   <rect x="320" y="104" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="104" width="133" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
+  <rect x="320" y="104" width="152" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="118" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">7/10</text>
+  <text x="520" y="118" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">8/10</text>
 
   <!-- row 2 -->
   <rect x="0" y="132" width="620" height="38" fill="#1e2433" />
@@ -63,9 +63,9 @@
   <!-- bar bg -->
   <rect x="320" y="180" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="180" width="114" height="18" rx="4" fill="#e09a25" opacity="0.85" />
+  <rect x="320" y="180" width="95" height="18" rx="4" fill="#e09a25" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="194" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e09a25" text-anchor="middle">6/10</text>
+  <text x="520" y="194" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e09a25" text-anchor="middle">5/10</text>
 
   <!-- row 4 -->
   <rect x="0" y="208" width="620" height="38" fill="#1e2433" />
@@ -85,9 +85,9 @@
   <!-- bar bg -->
   <rect x="320" y="256" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="256" width="152" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
+  <rect x="320" y="256" width="171" height="18" rx="4" fill="#2ec97a" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="270" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">8/10</text>
+  <text x="520" y="270" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2ec97a" text-anchor="middle">9/10</text>
 
   <!-- row 6 -->
   <rect x="0" y="284" width="620" height="38" fill="#1e2433" />
@@ -96,9 +96,9 @@
   <!-- bar bg -->
   <rect x="320" y="294" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="294" width="152" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
+  <rect x="320" y="294" width="133" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="308" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">8/10</text>
+  <text x="520" y="308" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">7/10</text>
 
   <!-- row 7 -->
   <rect x="0" y="322" width="620" height="38" fill="#232a3a" />
@@ -118,9 +118,9 @@
   <!-- bar bg -->
   <rect x="320" y="370" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="370" width="19" height="18" rx="4" fill="#e05252" opacity="0.85" />
+  <rect x="320" y="370" width="38" height="18" rx="4" fill="#e05252" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="384" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">1/10</text>
+  <text x="520" y="384" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">2/10</text>
 
   <!-- row 9 -->
   <rect x="0" y="398" width="620" height="38" fill="#232a3a" />
@@ -129,9 +129,9 @@
   <!-- bar bg -->
   <rect x="320" y="408" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="408" width="57" height="18" rx="4" fill="#e05252" opacity="0.85" />
+  <rect x="320" y="408" width="38" height="18" rx="4" fill="#e05252" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="422" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">3/10</text>
+  <text x="520" y="422" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">2/10</text>
 
   <!-- row 10 -->
   <rect x="0" y="436" width="620" height="38" fill="#1e2433" />
@@ -140,9 +140,9 @@
   <!-- bar bg -->
   <rect x="320" y="446" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="446" width="133" height="18" rx="4" fill="#2b9e7a" opacity="0.85" />
+  <rect x="320" y="446" width="114" height="18" rx="4" fill="#e09a25" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="460" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#2b9e7a" text-anchor="middle">7/10</text>
+  <text x="520" y="460" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e09a25" text-anchor="middle">6/10</text>
 
   <!-- row 11 -->
   <rect x="0" y="474" width="620" height="38" fill="#232a3a" />
@@ -151,9 +151,9 @@
   <!-- bar bg -->
   <rect x="320" y="484" width="190" height="18" rx="4" fill="#0d1117" />
   <!-- bar fill -->
-  <rect x="320" y="484" width="76" height="18" rx="4" fill="#e05252" opacity="0.85" />
+  <rect x="320" y="484" width="0" height="18" rx="4" fill="#e05252" opacity="0.85" />
   <!-- score label -->
-  <text x="520" y="498" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">4/10</text>
+  <text x="520" y="498" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" font-weight="bold" fill="#e05252" text-anchor="middle">0/10</text>
 
   <!-- row 12 -->
   <rect x="0" y="512" width="620" height="38" fill="#1e2433" />
@@ -173,9 +173,9 @@
   <!-- avg bar bg -->
   <rect x="320" y="562" width="190" height="24" rx="4" fill="#0d1117" />
   <!-- avg bar fill -->
-  <rect x="320" y="562" width="103" height="24" rx="4" fill="#e09a25" opacity="0.9" />
+  <rect x="320" y="562" width="95" height="24" rx="4" fill="#e09a25" opacity="0.9" />
   <!-- avg label -->
-  <text x="520" y="579" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="bold" fill="#e09a25" text-anchor="middle">5.4/10</text>
+  <text x="520" y="579" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="bold" fill="#e09a25" text-anchor="middle">5/10</text>
 
   </g>
 
