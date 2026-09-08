@@ -1,10 +1,16 @@
 
 import { z } from "zod";
+import { parse as parseYaml } from "yaml";
 import { CopilotClient, defineTool } from "@github/copilot-sdk";
 
 type EvaluationResult = {
     score: number;
     reasoning: string;
+};
+
+type SyntaxValidationResult = {
+    valid: boolean;
+    errors: string[];
 };
 
 const maxEvaluationAttempts = 3;
@@ -173,7 +179,55 @@ ${skillArtifacts.map(artifact => `<artifact path="${artifact.path}">${artifact.c
     return await evaluateBase(systemMessage, evaluationPrompt);
 }
 
+function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidationResult {
+    const errors: string[] = [];
+
+    const frontmatterMatch = agentDefinition.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+    if (!frontmatterMatch) {
+        return { valid: false, errors: ["Agent definition is missing a valid YAML frontmatter block delimited by '---' lines."] };
+    }
+
+    let frontmatter: unknown;
+    try {
+        frontmatter = parseYaml(frontmatterMatch[1] ?? "");
+    } catch (error) {
+        return { valid: false, errors: [`Frontmatter is not valid YAML: ${error instanceof Error ? error.message : String(error)}`] };
+    }
+
+    if (typeof frontmatter !== "object" || frontmatter === null || Array.isArray(frontmatter)) {
+        return { valid: false, errors: ["Frontmatter must be a YAML mapping of key/value pairs."] };
+    }
+
+    const fields = frontmatter as Record<string, unknown>;
+
+    if (typeof fields.name !== "string" || fields.name.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'name' field.");
+    }
+
+    if (typeof fields.description !== "string" || fields.description.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'description' field.");
+    }
+
+    if ("tools" in fields && !Array.isArray(fields.tools)) {
+        errors.push("Frontmatter 'tools' field must be an array.");
+    }
+
+    const body = agentDefinition.slice(frontmatterMatch[0].length).trim();
+    if (body.length === 0) {
+        errors.push("Agent definition is missing body content after the frontmatter.");
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
 async function evaluateAgentDefinition(agentDefinition: string): Promise<EvaluationResult> {
+    const syntaxCheck = validateAgentDefinitionSyntax(agentDefinition);
+    if (!syntaxCheck.valid) {
+        return {
+            score: 0,
+            reasoning: `Agent definition is malformed and cannot be evaluated: ${syntaxCheck.errors.join(" ")}`,
+        };
+    }
 
     const systemMessage = `
 ${baseRole}
@@ -194,7 +248,8 @@ ${agentDefinition}
 export {
     evaluatePerformance,
     evaluateSkillDefinition,
-    evaluateAgentDefinition
+    evaluateAgentDefinition,
+    validateAgentDefinitionSyntax
 };
 
 export type { EvaluationResult };
