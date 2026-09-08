@@ -103,6 +103,9 @@ Every evaluation should include a reasoning to justify the score given.
 10 - Exceptional: The agent or skill performs exceptionally well, exceeding expectations and demonstrating advanced capabilities
 </scoring>`;
 
+const agentModelFitCriterion = `
+5. Model fit: Is the frontmatter 'model' choice (if any) reasonable for the agent's role? A lightweight, narrowly-scoped agent (e.g. simple formatting, read-only summarization) that pins an expensive, high-reasoning model is wasteful. A complex agent that requires deep reasoning, planning, or multi-step tool orchestration (e.g. an orchestrator, spec analyzer, or implementer) paired with a small/fast/"mini"/"nano"/"flash" model is likely under-powered. An omitted 'model' field or 'Auto' is a reasonable, neutral choice and should not be penalized. Factor this into the overall score alongside the other criteria.`;
+
 async function evaluateBase(systemMessage: string, evaluationPrompt: string): Promise<EvaluationResult> {
     for (let attempt = 1; attempt <= maxEvaluationAttempts; attempt++) {
         try {
@@ -282,7 +285,7 @@ async function evaluateAgentDefinition(agentDefinition: string): Promise<Evaluat
     }
 
     const systemMessage = `
-${baseRole}
+${baseRole}${agentModelFitCriterion}
 ${scoringSystem}
 `;
     const evaluationPrompt = `
