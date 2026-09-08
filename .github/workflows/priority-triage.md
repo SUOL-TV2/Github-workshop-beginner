@@ -11,9 +11,13 @@ on:
         description: Optional single issue number to process.
         type: number
         required: false
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 permissions:
   contents: read
   issues: read
+  pull-requests: read
+  copilot-requests: write
 strict: true
 tools:
   github:
@@ -22,6 +26,7 @@ tools:
 steps:
   - name: Fetch open issues and optional scope
     env:
+      GH_TOKEN: ${{ github.token }}
       ISSUE_NUMBER: ${{ inputs.issue-number }}
     run: |
       set -euo pipefail
@@ -35,11 +40,6 @@ steps:
       fi
       gh issue list --state open --limit 200 --json number,title,body,labels,url > /tmp/gh-aw/data/open-issues.json
 safe-outputs:
-  replace-label:
-    allowed-add: [high, medium, low]
-    allowed-remove: [high, medium, low, "priority/high", "priority/medium", "priority/low", p0, p1, p2, p3, critical, blocker, urgent]
-    max: 200
-    target: "*"
   add-labels:
     allowed: [high, medium, low]
     max: 200
@@ -49,10 +49,10 @@ safe-outputs:
     max: 200
     target: "*"
   add-comment:
-    max: 200
+    max: 100
     target: "*"
   link-sub-issue:
-    max: 200
+    max: 100
 ---
 
 # Priority Triage and Task Grouping
@@ -69,7 +69,7 @@ For each open issue in scope:
    - `medium`: important but not immediately blocking; meaningful impact with moderate urgency.
    - `low`: nice-to-have, exploratory, or deferred work with low urgency.
 3. Remove outdated legacy priority labels (`priority/high`, `priority/medium`, `priority/low`, `p0`-`p3`, `critical`, `blocker`, `urgent`) when present.
-4. Every time you change an issue's priority state (add/remove/replace priority labels), post a comment on that issue explaining:
+4. Every time you change an issue's priority state (add/remove priority labels), post a comment on that issue explaining:
    - what changed,
    - the reasoning for the new priority,
    - which evidence from the issue content or metadata was used.
