@@ -63,3 +63,14 @@ See the [evaluator documentation](./docs/evaluator.md) for usage, arguments, eva
 
 In this repository we aim to have an application residing in the src folder. Here you can find a description of it and functional requirements.
 
+### Application architecture
+
+The browser game is organized into small TypeScript modules:
+
+- `src/game/` owns game state, updates, and the requestAnimationFrame loop.
+- `src/render/` draws level data and state to a canvas context.
+- `src/input/` owns keyboard input state and listener lifecycle.
+- `src/levels/` contains the JSON-serializable level format and level data.
+
+Run `npm install`, then `npm run build` to compile the app. `npm run dev` serves the compiled
+placeholder scene at `http://localhost:4173`, and `npm test` runs the game-loop smoke test.
