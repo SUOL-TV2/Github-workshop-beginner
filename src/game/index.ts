@@ -1,0 +1,16 @@
+export {
+  FailureController,
+  intersects,
+  type Checkpoint,
+  type FailureControllerOptions,
+  type FailureEvent,
+  type FailureReason,
+  type FailureState,
+  type Hazard,
+  type HazardType,
+  type LevelBounds,
+  type LevelData,
+  type PlayerState,
+  type Rectangle,
+  type Vector,
+} from "./failure.ts";
