@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateAgentDefinition, evaluateSkillDefinition } from "./evaluate.js";
+import { evaluateAgentDefinition, evaluateSkillDefinition, validateAgentDefinitionSyntax } from "./evaluate.js";
 
 // Live Copilot SDK calls: no mocking, results vary run to run.
 const liveCallTimeout = 60_000;
@@ -60,6 +60,101 @@ name: logs
 
 Do something with the log files I guess, compress them or delete them or whatever works.
 `;
+
+const malformedAgentDefinitionNoFrontmatter = `# Just a heading
+
+No frontmatter block here at all.
+`;
+
+const malformedAgentDefinitionInvalidYaml = `---
+name: broken
+description: [unterminated
+---
+
+Some body content.
+`;
+
+const malformedAgentDefinitionMissingFields = `---
+tools: ["read"]
+---
+
+Some body content, but no name or description.
+`;
+
+const agentDefinitionWithUnknownModel = `---
+name: thing
+description: Does a thing.
+model: Totally Made Up Model 9000 (copilot)
+---
+
+Some body content.
+`;
+
+const agentDefinitionWithNoModel = `---
+name: thing
+description: Does a thing.
+---
+
+Some body content.
+`;
+
+const agentDefinitionWithEmptyToolsList = `---
+name: thing
+description: Does a thing.
+tools: []
+---
+
+Some body content.
+`;
+
+test("validateAgentDefinitionSyntax accepts a well-formed agent definition", () => {
+    const result = validateAgentDefinitionSyntax(goodAgentDefinition);
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
+});
+
+test("validateAgentDefinitionSyntax rejects a definition with no frontmatter", () => {
+    const result = validateAgentDefinitionSyntax(malformedAgentDefinitionNoFrontmatter);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.length > 0);
+});
+
+test("validateAgentDefinitionSyntax rejects invalid YAML frontmatter", () => {
+    const result = validateAgentDefinitionSyntax(malformedAgentDefinitionInvalidYaml);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.length > 0);
+});
+
+test("validateAgentDefinitionSyntax rejects frontmatter missing required fields", () => {
+    const result = validateAgentDefinitionSyntax(malformedAgentDefinitionMissingFields);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("name")));
+    assert.ok(result.errors.some((error) => error.includes("description")));
+});
+
+test("validateAgentDefinitionSyntax rejects an unrecognized model", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithUnknownModel);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("unrecognized model")));
+});
+
+test("validateAgentDefinitionSyntax treats an undefined model as fine", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithNoModel);
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
+});
+
+test("validateAgentDefinitionSyntax rejects an empty tools allowlist", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithEmptyToolsList);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("empty")));
+});
+
+test("evaluateAgentDefinition returns a zero score for malformed agent definitions without calling the model", async () => {
+    const evaluation = await evaluateAgentDefinition(malformedAgentDefinitionNoFrontmatter);
+    assert.equal(evaluation.score, 0);
+    assert.ok(evaluation.reasoning.length > 0);
+});
 
 test(
     "evaluateAgentDefinition scores a well-formed agent higher than a vague one",

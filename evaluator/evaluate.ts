@@ -1,11 +1,58 @@
 
 import { z } from "zod";
+import { parse as parseYaml } from "yaml";
 import { CopilotClient, defineTool } from "@github/copilot-sdk";
 
 type EvaluationResult = {
     score: number;
     reasoning: string;
 };
+
+type SyntaxValidationResult = {
+    valid: boolean;
+    errors: string[];
+};
+
+// Known GitHub Copilot model names (vendor-agnostic), per docs.github.com/en/copilot/using-github-copilot/ai-models/supported-ai-models-in-copilot
+const KNOWN_MODEL_NAMES = [
+    "auto",
+    "gpt-5 mini",
+    "gpt-5.3-codex",
+    "gpt-5.4",
+    "gpt-5.4 mini",
+    "gpt-5.4 nano",
+    "gpt-5.5",
+    "gpt-5.6 luna",
+    "gpt-5.6 sol",
+    "gpt-5.6 terra",
+    "gpt-6 astra",
+    "claude haiku 4.5",
+    "claude opus 4.7",
+    "claude opus 4.8",
+    "claude opus 4.8 (fast mode) (preview)",
+    "claude opus 5",
+    "claude sonnet 4.6",
+    "claude sonnet 5",
+    "claude fable 5",
+    "claude fable 5.1",
+    "gemini 3.5 flash",
+    "gemini 3.6 flash",
+    "gemini 3.7 flash",
+    "gemini 3.8 flash",
+    "mai-code-1-flash",
+    "mai-code-1.1-flash",
+    "kimi k2.7 code",
+    "kimi k3",
+    "grok 4.5",
+    "grok 4.6",
+];
+
+function isKnownModelName(rawModelName: string): boolean {
+    // Strip a trailing "(vendor)" annotation, e.g. "Claude Sonnet 5 (copilot)" -> "Claude Sonnet 5".
+    const vendorSuffixPattern = /\s*\((copilot|openai|anthropic|google|microsoft|moonshot ai|xai)\)\s*$/i;
+    const normalized = rawModelName.replace(vendorSuffixPattern, "").trim().toLowerCase();
+    return KNOWN_MODEL_NAMES.includes(normalized);
+}
 
 const maxEvaluationAttempts = 3;
 
@@ -55,6 +102,12 @@ Every evaluation should include a reasoning to justify the score given.
 9 - Outstanding: The agent or skill performs exceptionally well, with very few issues or areas for improvement.
 10 - Exceptional: The agent or skill performs exceptionally well, exceeding expectations and demonstrating advanced capabilities
 </scoring>`;
+
+const agentModelFitCriterion = `
+5. Model fit: Is the frontmatter 'model' choice (if any) reasonable for the agent's role? A lightweight, narrowly-scoped agent (e.g. simple formatting, read-only summarization) that pins an expensive, high-reasoning model is wasteful. A complex agent that requires deep reasoning, planning, or multi-step tool orchestration (e.g. an orchestrator, spec analyzer, or implementer) paired with a small/fast/"mini"/"nano"/"flash" model is likely under-powered. An omitted 'model' field or 'Auto' is a reasonable, neutral choice and should not be penalized. Factor this into the overall score alongside the other criteria.`;
+
+const agentToolAllowlistFitCriterion = `
+6. Tool allow-list fit: Is the frontmatter 'tools' allowlist appropriately scoped for the agent's described role? Too loose: a read-only reviewer/planner/analyzer is granted 'edit', 'execute', or 'bash' it has no stated need for. Too narrow: an agent whose description requires editing, executing commands, or searching the web is missing the corresponding tool (e.g. an "implementer" without 'edit'/'write', or a "release helper" without an execute-class tool). A well-scoped agent grants exactly the tools its stated responsibilities require, no more and no less. Factor this into the overall score alongside the other criteria.`;
 
 async function evaluateBase(systemMessage: string, evaluationPrompt: string): Promise<EvaluationResult> {
     for (let attempt = 1; attempt <= maxEvaluationAttempts; attempt++) {
@@ -173,10 +226,71 @@ ${skillArtifacts.map(artifact => `<artifact path="${artifact.path}">${artifact.c
     return await evaluateBase(systemMessage, evaluationPrompt);
 }
 
+function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidationResult {
+    const errors: string[] = [];
+
+    const frontmatterMatch = agentDefinition.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+    if (!frontmatterMatch) {
+        return { valid: false, errors: ["Agent definition is missing a valid YAML frontmatter block delimited by '---' lines."] };
+    }
+
+    let frontmatter: unknown;
+    try {
+        frontmatter = parseYaml(frontmatterMatch[1] ?? "");
+    } catch (error) {
+        return { valid: false, errors: [`Frontmatter is not valid YAML: ${error instanceof Error ? error.message : String(error)}`] };
+    }
+
+    if (typeof frontmatter !== "object" || frontmatter === null || Array.isArray(frontmatter)) {
+        return { valid: false, errors: ["Frontmatter must be a YAML mapping of key/value pairs."] };
+    }
+
+    const fields = frontmatter as Record<string, unknown>;
+
+    if (typeof fields.name !== "string" || fields.name.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'name' field.");
+    }
+
+    if (typeof fields.description !== "string" || fields.description.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'description' field.");
+    }
+
+    if ("tools" in fields && !Array.isArray(fields.tools)) {
+        errors.push("Frontmatter 'tools' field must be an array.");
+    } else if (Array.isArray(fields.tools) && fields.tools.length === 0) {
+        errors.push("Frontmatter 'tools' field is empty; the agent would have no usable capabilities.");
+    }
+
+    if ("model" in fields && fields.model !== undefined) {
+        const modelValues = Array.isArray(fields.model) ? fields.model : [fields.model];
+        for (const modelValue of modelValues) {
+            if (typeof modelValue !== "string" || modelValue.trim().length === 0) {
+                errors.push("Frontmatter 'model' field must be a non-empty string or an array of non-empty strings.");
+            } else if (!isKnownModelName(modelValue)) {
+                errors.push(`Frontmatter 'model' field references an unrecognized model: '${modelValue}'.`);
+            }
+        }
+    }
+
+    const body = agentDefinition.slice(frontmatterMatch[0].length).trim();
+    if (body.length === 0) {
+        errors.push("Agent definition is missing body content after the frontmatter.");
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
 async function evaluateAgentDefinition(agentDefinition: string): Promise<EvaluationResult> {
+    const syntaxCheck = validateAgentDefinitionSyntax(agentDefinition);
+    if (!syntaxCheck.valid) {
+        return {
+            score: 0,
+            reasoning: `Agent definition is malformed and cannot be evaluated: ${syntaxCheck.errors.join(" ")}`,
+        };
+    }
 
     const systemMessage = `
-${baseRole}
+${baseRole}${agentModelFitCriterion}${agentToolAllowlistFitCriterion}
 ${scoringSystem}
 `;
     const evaluationPrompt = `
@@ -194,7 +308,8 @@ ${agentDefinition}
 export {
     evaluatePerformance,
     evaluateSkillDefinition,
-    evaluateAgentDefinition
+    evaluateAgentDefinition,
+    validateAgentDefinitionSyntax
 };
 
 export type { EvaluationResult };
