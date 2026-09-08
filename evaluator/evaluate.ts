@@ -13,6 +13,47 @@ type SyntaxValidationResult = {
     errors: string[];
 };
 
+// Known GitHub Copilot model names (vendor-agnostic), per docs.github.com/en/copilot/using-github-copilot/ai-models/supported-ai-models-in-copilot
+const KNOWN_MODEL_NAMES = [
+    "auto",
+    "gpt-5 mini",
+    "gpt-5.3-codex",
+    "gpt-5.4",
+    "gpt-5.4 mini",
+    "gpt-5.4 nano",
+    "gpt-5.5",
+    "gpt-5.6 luna",
+    "gpt-5.6 sol",
+    "gpt-5.6 terra",
+    "gpt-6 astra",
+    "claude haiku 4.5",
+    "claude opus 4.7",
+    "claude opus 4.8",
+    "claude opus 4.8 (fast mode) (preview)",
+    "claude opus 5",
+    "claude sonnet 4.6",
+    "claude sonnet 5",
+    "claude fable 5",
+    "claude fable 5.1",
+    "gemini 3.5 flash",
+    "gemini 3.6 flash",
+    "gemini 3.7 flash",
+    "gemini 3.8 flash",
+    "mai-code-1-flash",
+    "mai-code-1.1-flash",
+    "kimi k2.7 code",
+    "kimi k3",
+    "grok 4.5",
+    "grok 4.6",
+];
+
+function isKnownModelName(rawModelName: string): boolean {
+    // Strip a trailing "(vendor)" annotation, e.g. "Claude Sonnet 5 (copilot)" -> "Claude Sonnet 5".
+    const vendorSuffixPattern = /\s*\((copilot|openai|anthropic|google|microsoft|moonshot ai|xai)\)\s*$/i;
+    const normalized = rawModelName.replace(vendorSuffixPattern, "").trim().toLowerCase();
+    return KNOWN_MODEL_NAMES.includes(normalized);
+}
+
 const maxEvaluationAttempts = 3;
 
 function isEvalFailure(error: unknown): boolean {
@@ -210,6 +251,17 @@ function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidatio
 
     if ("tools" in fields && !Array.isArray(fields.tools)) {
         errors.push("Frontmatter 'tools' field must be an array.");
+    }
+
+    if ("model" in fields && fields.model !== undefined) {
+        const modelValues = Array.isArray(fields.model) ? fields.model : [fields.model];
+        for (const modelValue of modelValues) {
+            if (typeof modelValue !== "string" || modelValue.trim().length === 0) {
+                errors.push("Frontmatter 'model' field must be a non-empty string or an array of non-empty strings.");
+            } else if (!isKnownModelName(modelValue)) {
+                errors.push(`Frontmatter 'model' field references an unrecognized model: '${modelValue}'.`);
+            }
+        }
     }
 
     const body = agentDefinition.slice(frontmatterMatch[0].length).trim();

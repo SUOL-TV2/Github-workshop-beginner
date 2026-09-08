@@ -81,6 +81,23 @@ tools: ["read"]
 Some body content, but no name or description.
 `;
 
+const agentDefinitionWithUnknownModel = `---
+name: thing
+description: Does a thing.
+model: Totally Made Up Model 9000 (copilot)
+---
+
+Some body content.
+`;
+
+const agentDefinitionWithNoModel = `---
+name: thing
+description: Does a thing.
+---
+
+Some body content.
+`;
+
 test("validateAgentDefinitionSyntax accepts a well-formed agent definition", () => {
     const result = validateAgentDefinitionSyntax(goodAgentDefinition);
     assert.equal(result.valid, true);
@@ -104,6 +121,18 @@ test("validateAgentDefinitionSyntax rejects frontmatter missing required fields"
     assert.equal(result.valid, false);
     assert.ok(result.errors.some((error) => error.includes("name")));
     assert.ok(result.errors.some((error) => error.includes("description")));
+});
+
+test("validateAgentDefinitionSyntax rejects an unrecognized model", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithUnknownModel);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("unrecognized model")));
+});
+
+test("validateAgentDefinitionSyntax treats an undefined model as fine", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithNoModel);
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
 });
 
 test("evaluateAgentDefinition returns a zero score for malformed agent definitions without calling the model", async () => {
