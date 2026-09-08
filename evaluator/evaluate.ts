@@ -106,6 +106,9 @@ Every evaluation should include a reasoning to justify the score given.
 const agentModelFitCriterion = `
 5. Model fit: Is the frontmatter 'model' choice (if any) reasonable for the agent's role? A lightweight, narrowly-scoped agent (e.g. simple formatting, read-only summarization) that pins an expensive, high-reasoning model is wasteful. A complex agent that requires deep reasoning, planning, or multi-step tool orchestration (e.g. an orchestrator, spec analyzer, or implementer) paired with a small/fast/"mini"/"nano"/"flash" model is likely under-powered. An omitted 'model' field or 'Auto' is a reasonable, neutral choice and should not be penalized. Factor this into the overall score alongside the other criteria.`;
 
+const agentToolAllowlistFitCriterion = `
+6. Tool allow-list fit: Is the frontmatter 'tools' allowlist appropriately scoped for the agent's described role? Too loose: a read-only reviewer/planner/analyzer is granted 'edit', 'execute', or 'bash' it has no stated need for. Too narrow: an agent whose description requires editing, executing commands, or searching the web is missing the corresponding tool (e.g. an "implementer" without 'edit'/'write', or a "release helper" without an execute-class tool). A well-scoped agent grants exactly the tools its stated responsibilities require, no more and no less. Factor this into the overall score alongside the other criteria.`;
+
 async function evaluateBase(systemMessage: string, evaluationPrompt: string): Promise<EvaluationResult> {
     for (let attempt = 1; attempt <= maxEvaluationAttempts; attempt++) {
         try {
@@ -254,6 +257,8 @@ function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidatio
 
     if ("tools" in fields && !Array.isArray(fields.tools)) {
         errors.push("Frontmatter 'tools' field must be an array.");
+    } else if (Array.isArray(fields.tools) && fields.tools.length === 0) {
+        errors.push("Frontmatter 'tools' field is empty; the agent would have no usable capabilities.");
     }
 
     if ("model" in fields && fields.model !== undefined) {
@@ -285,7 +290,7 @@ async function evaluateAgentDefinition(agentDefinition: string): Promise<Evaluat
     }
 
     const systemMessage = `
-${baseRole}${agentModelFitCriterion}
+${baseRole}${agentModelFitCriterion}${agentToolAllowlistFitCriterion}
 ${scoringSystem}
 `;
     const evaluationPrompt = `

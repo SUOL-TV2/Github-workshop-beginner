@@ -98,6 +98,15 @@ description: Does a thing.
 Some body content.
 `;
 
+const agentDefinitionWithEmptyToolsList = `---
+name: thing
+description: Does a thing.
+tools: []
+---
+
+Some body content.
+`;
+
 test("validateAgentDefinitionSyntax accepts a well-formed agent definition", () => {
     const result = validateAgentDefinitionSyntax(goodAgentDefinition);
     assert.equal(result.valid, true);
@@ -133,6 +142,12 @@ test("validateAgentDefinitionSyntax treats an undefined model as fine", () => {
     const result = validateAgentDefinitionSyntax(agentDefinitionWithNoModel);
     assert.equal(result.valid, true);
     assert.deepEqual(result.errors, []);
+});
+
+test("validateAgentDefinitionSyntax rejects an empty tools allowlist", () => {
+    const result = validateAgentDefinitionSyntax(agentDefinitionWithEmptyToolsList);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("empty")));
 });
 
 test("evaluateAgentDefinition returns a zero score for malformed agent definitions without calling the model", async () => {
