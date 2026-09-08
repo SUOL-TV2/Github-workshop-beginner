@@ -7,11 +7,13 @@ automated evidence, and explicit approval before merge.
 
 ## Workflows
 
-| Workflow                                                      | Trigger                                                                | Purpose                                                           |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [Plan and Implement](../.github/workflows/plan-implement.yml) | `issues.labeled` (`copilot:plan-and-implement`) or `workflow_dispatch` | Plans, risk-scores, and implements the change on an agent branch. |
-| [Plan Gate](../.github/workflows/plan-gate.yml)               | `pull_request` to `main`                                               | Blocks PRs whose body does not follow the required plan template. |
-| [Evaluate Agents & Skills](../.github/workflows/evaluate.yml) | `workflow_dispatch`                                                    | Scores agent/skill definitions and publishes a badge.             |
+| Workflow                                                                | Trigger                                                                | Purpose                                                                                                              |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [Plan and Implement](../.github/workflows/plan-implement.yml)           | `issues.labeled` (`copilot:plan-and-implement`) or `workflow_dispatch` | Plans, risk-scores, and implements the change on an agent branch.                                                    |
+| [Plan Gate](../.github/workflows/plan-gate.yml)                         | `pull_request` to `main`                                               | Blocks PRs whose body does not follow the required plan template.                                                    |
+| [Evaluate Agents & Skills](../.github/workflows/evaluate.yml)           | `workflow_dispatch`                                                    | Scores agent/skill definitions and publishes a badge.                                                                |
+| [Evaluate Changed Artifacts](../.github/workflows/evaluate-changed.yml) | `pull_request` touching agent/skill files                              | Scores only the changed agents/skills and fails if an agent's score drops more than 2 points versus the base branch. |
+| [Enforce Branch Protection](../.github/workflows/branch-protection.yml) | `workflow_dispatch` (repo admin)                                       | Applies branch protection on `main`, requiring the `evaluate` check and PR review.                                   |
 
 ## Reusable actions
 

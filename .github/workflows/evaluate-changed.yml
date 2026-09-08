@@ -1,0 +1,120 @@
+name: Evaluate Changed Artifacts
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/agents/**"
+      - ".agents/agents/**"
+      - ".github/skills/**"
+      - ".agents/skills/**"
+
+concurrency:
+  group: evaluate-changed-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: evaluate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      copilot-requests: write
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: evaluator/package-lock.json
+
+      - name: Determine changed agent/skill artifacts
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed_files.txt
+
+          # One line per changed agent file.
+          grep -E '^\.github/agents/[^/]+\.agent\.md$|^\.agents/agents/[^/]+\.agent\.md$' changed_files.txt > changed_agents.txt || true
+
+          # A skill is one artifact no matter how many files inside it changed.
+          awk -F/ '
+            /^\.github\/skills\// { print $1"/"$2"/"$3 }
+            /^\.agents\/skills\// { print $1"/"$2"/"$3 }
+          ' changed_files.txt | sort -u > changed_skills.txt || true
+
+          artifacts=$( (cat changed_agents.txt; cat changed_skills.txt) | sed 's#^#../#' | paste -sd, - )
+          echo "artifacts=$artifacts" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$artifacts" ]; then
+            echo "has_artifacts=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_artifacts=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Changed artifacts: ${artifacts:-none}"
+
+      - name: Install evaluator dependencies
+        if: steps.changed.outputs.has_artifacts == 'true'
+        working-directory: evaluator
+        run: npm ci
+
+      - name: Evaluate current (PR head) artifacts
+        if: steps.changed.outputs.has_artifacts == 'true'
+        working-directory: evaluator
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          npx tsx cli.ts evaluate --files "${{ steps.changed.outputs.artifacts }}" --json > current.jsonl
+
+      - name: Evaluate previous (base) artifacts
+        if: steps.changed.outputs.has_artifacts == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ARTIFACTS: ${{ steps.changed.outputs.artifacts }}
+        run: |
+          git worktree add /tmp/base-checkout "$BASE_SHA"
+
+          # Only artifacts that already existed on the base commit have a previous score.
+          existing=""
+          IFS=',' read -ra FILES <<< "$ARTIFACTS"
+          for f in "${FILES[@]}"; do
+            if [ -e "/tmp/base-checkout/evaluator/$f" ]; then
+              existing="$existing,$f"
+            fi
+          done
+          existing="${existing#,}"
+
+          if [ -n "$existing" ]; then
+            (cd /tmp/base-checkout/evaluator && npm ci && npx tsx cli.ts evaluate --files "$existing" --json) > "${{ github.workspace }}/evaluator/previous.jsonl"
+          else
+            : > "${{ github.workspace }}/evaluator/previous.jsonl"
+          fi
+
+      - name: Compare current and previous scores
+        if: steps.changed.outputs.has_artifacts == 'true'
+        working-directory: evaluator
+        run: npx tsx compare-scores.ts current.jsonl previous.jsonl
+
+      - name: Upload score reports
+        if: steps.changed.outputs.has_artifacts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-eval-scores
+          path: |
+            evaluator/current.jsonl
+            evaluator/previous.jsonl
+          if-no-files-found: ignore
+
+      - name: No changed artifacts
+        if: steps.changed.outputs.has_artifacts != 'true'
+        run: echo "No changed agent or skill artifacts in this PR; nothing to evaluate." >> "$GITHUB_STEP_SUMMARY"
