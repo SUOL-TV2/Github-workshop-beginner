@@ -109,6 +109,11 @@ const agentModelFitCriterion = `
 const agentToolAllowlistFitCriterion = `
 6. Tool allow-list fit: Is the frontmatter 'tools' allowlist appropriately scoped for the agent's described role? Too loose: a read-only reviewer/planner/analyzer is granted 'edit', 'execute', or 'bash' it has no stated need for. Too narrow: an agent whose description requires editing, executing commands, or searching the web is missing the corresponding tool (e.g. an "implementer" without 'edit'/'write', or a "release helper" without an execute-class tool). A well-scoped agent grants exactly the tools its stated responsibilities require, no more and no less. Factor this into the overall score alongside the other criteria.`;
 
+const skillFitCriteria = `
+5. Name/description fit: Does the frontmatter 'name' and 'description' accurately reflect what the skill's body actually instructs? A description that promises something the body doesn't deliver (or vice versa) is misleading, since Copilot decides whether to load the skill based on the description alone.
+6. Referenced files: If the analysis notes below list referenced files that are missing from the supporting files, treat that as a broken skill — links to templates, scripts, or examples that don't exist will fail at runtime.
+7. Project specificity: Does the skill ground its instructions in concrete, actionable detail (specific commands, file paths, naming conventions) rather than vague, generic advice that could apply to any codebase? Skills that are too generic provide little value over the model's default behavior. Factor this into the overall score alongside the other criteria.`;
+
 async function evaluateBase(systemMessage: string, evaluationPrompt: string): Promise<EvaluationResult> {
     for (let attempt = 1; attempt <= maxEvaluationAttempts; attempt++) {
         try {
@@ -203,9 +208,25 @@ ${expectations}
     return await evaluateBase(systemMessage, evaluationPrompt);
 }
 
-async function evaluateSkillDefinition(skillDefinition: string, skillArtifacts?: { path: string; content: string }[]) : Promise<EvaluationResult> {
+async function evaluateSkillDefinition(
+    skillDefinition: string,
+    skillArtifacts?: { path: string; content: string }[],
+    skillDirectoryName?: string
+): Promise<EvaluationResult> {
+    const syntaxCheck = validateSkillDefinitionSyntax(skillDefinition, skillDirectoryName);
+    if (!syntaxCheck.valid) {
+        return {
+            score: 0,
+            reasoning: `Skill definition is malformed and cannot be evaluated: ${syntaxCheck.errors.join(" ")}`,
+        };
+    }
+
+    const supportingFilePaths = new Set((skillArtifacts ?? []).map((artifact) => artifact.path));
+    const referencedFiles = extractReferencedRelativeFiles(skillDefinition);
+    const missingReferencedFiles = referencedFiles.filter((file) => !supportingFilePaths.has(file));
+
     const systemMessage = `
-${baseRole}
+${baseRole}${skillFitCriteria}
 ${scoringSystem}
 `;
     let evaluationPrompt = `
@@ -222,30 +243,69 @@ ${skillArtifacts.map(artifact => `<artifact path="${artifact.path}">${artifact.c
 </skill-artifacts>
 `;
     }
+    evaluationPrompt += `
+<referenced-files-analysis>
+Files referenced by relative links in the skill body: ${referencedFiles.length > 0 ? referencedFiles.join(", ") : "none"}
+Referenced files missing from the supporting files listed above: ${missingReferencedFiles.length > 0 ? missingReferencedFiles.join(", ") : "none"}
+</referenced-files-analysis>
+`;
 
     return await evaluateBase(systemMessage, evaluationPrompt);
 }
 
-function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidationResult {
-    const errors: string[] = [];
+function extractReferencedRelativeFiles(skillDefinition: string): string[] {
+    const linkPattern = /\]\(([^)]+)\)/g;
+    const referenced = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = linkPattern.exec(skillDefinition)) !== null) {
+        const target = (match[1] ?? "").trim();
+        if (!target || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("#")) {
+            // Skip absolute URLs (http:, mailto:, etc.) and in-page anchors.
+            continue;
+        }
+        referenced.add(target.replace(/^\.\//, ""));
+    }
+    return [...referenced];
+}
 
-    const frontmatterMatch = agentDefinition.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+type FrontmatterParseResult =
+    | { ok: true; fields: Record<string, unknown>; body: string; frontmatterLength: number }
+    | { ok: false; errors: string[] };
+
+function parseFrontmatterBlock(definition: string): FrontmatterParseResult {
+    const frontmatterMatch = definition.match(/^---\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
     if (!frontmatterMatch) {
-        return { valid: false, errors: ["Agent definition is missing a valid YAML frontmatter block delimited by '---' lines."] };
+        return { ok: false, errors: ["Definition is missing a valid YAML frontmatter block delimited by '---' lines."] };
     }
 
     let frontmatter: unknown;
     try {
         frontmatter = parseYaml(frontmatterMatch[1] ?? "");
     } catch (error) {
-        return { valid: false, errors: [`Frontmatter is not valid YAML: ${error instanceof Error ? error.message : String(error)}`] };
+        return { ok: false, errors: [`Frontmatter is not valid YAML: ${error instanceof Error ? error.message : String(error)}`] };
     }
 
     if (typeof frontmatter !== "object" || frontmatter === null || Array.isArray(frontmatter)) {
-        return { valid: false, errors: ["Frontmatter must be a YAML mapping of key/value pairs."] };
+        return { ok: false, errors: ["Frontmatter must be a YAML mapping of key/value pairs."] };
     }
 
-    const fields = frontmatter as Record<string, unknown>;
+    return {
+        ok: true,
+        fields: frontmatter as Record<string, unknown>,
+        body: definition.slice(frontmatterMatch[0].length).trim(),
+        frontmatterLength: frontmatterMatch[0].length,
+    };
+}
+
+function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidationResult {
+    const errors: string[] = [];
+
+    const parsed = parseFrontmatterBlock(agentDefinition);
+    if (!parsed.ok) {
+        return { valid: false, errors: parsed.errors };
+    }
+
+    const fields = parsed.fields;
 
     if (typeof fields.name !== "string" || fields.name.trim().length === 0) {
         errors.push("Frontmatter is missing a non-empty 'name' field.");
@@ -272,9 +332,35 @@ function validateAgentDefinitionSyntax(agentDefinition: string): SyntaxValidatio
         }
     }
 
-    const body = agentDefinition.slice(frontmatterMatch[0].length).trim();
-    if (body.length === 0) {
+    if (parsed.body.length === 0) {
         errors.push("Agent definition is missing body content after the frontmatter.");
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
+function validateSkillDefinitionSyntax(skillDefinition: string, skillDirectoryName?: string): SyntaxValidationResult {
+    const errors: string[] = [];
+
+    const parsed = parseFrontmatterBlock(skillDefinition);
+    if (!parsed.ok) {
+        return { valid: false, errors: parsed.errors };
+    }
+
+    const fields = parsed.fields;
+
+    if (typeof fields.name !== "string" || fields.name.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'name' field.");
+    } else if (skillDirectoryName !== undefined && fields.name.trim() !== skillDirectoryName) {
+        errors.push(`Frontmatter 'name' ('${fields.name}') must match the skill's folder name ('${skillDirectoryName}').`);
+    }
+
+    if (typeof fields.description !== "string" || fields.description.trim().length === 0) {
+        errors.push("Frontmatter is missing a non-empty 'description' field.");
+    }
+
+    if (parsed.body.length === 0) {
+        errors.push("Skill definition is missing body content after the frontmatter.");
     }
 
     return { valid: errors.length === 0, errors };
@@ -309,7 +395,8 @@ export {
     evaluatePerformance,
     evaluateSkillDefinition,
     evaluateAgentDefinition,
-    validateAgentDefinitionSyntax
+    validateAgentDefinitionSyntax,
+    validateSkillDefinitionSyntax
 };
 
 export type { EvaluationResult };

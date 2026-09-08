@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateAgentDefinition, evaluateSkillDefinition, validateAgentDefinitionSyntax } from "./evaluate.js";
+import { evaluateAgentDefinition, evaluateSkillDefinition, validateAgentDefinitionSyntax, validateSkillDefinitionSyntax } from "./evaluate.js";
 
 // Live Copilot SDK calls: no mocking, results vary run to run.
 const liveCallTimeout = 60_000;
@@ -107,6 +107,42 @@ tools: []
 Some body content.
 `;
 
+const malformedSkillDefinitionMissingDescription = `---
+name: logs
+---
+
+Do something with the log files I guess, compress them or delete them or whatever works.
+`;
+
+test("validateSkillDefinitionSyntax accepts a well-formed skill definition", () => {
+    const result = validateSkillDefinitionSyntax(goodSkillDefinition, "rotate-log-files");
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
+});
+
+test("validateSkillDefinitionSyntax rejects a definition with no frontmatter", () => {
+    const result = validateSkillDefinitionSyntax(malformedAgentDefinitionNoFrontmatter);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.length > 0);
+});
+
+test("validateSkillDefinitionSyntax rejects frontmatter missing required fields", () => {
+    const result = validateSkillDefinitionSyntax(malformedSkillDefinitionMissingDescription);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("description")));
+});
+
+test("validateSkillDefinitionSyntax rejects a name that doesn't match the skill folder", () => {
+    const result = validateSkillDefinitionSyntax(goodSkillDefinition, "some-other-folder-name");
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.some((error) => error.includes("folder name")));
+});
+
+test("validateSkillDefinitionSyntax is fine without a folder name to compare against", () => {
+    const result = validateSkillDefinitionSyntax(goodSkillDefinition);
+    assert.equal(result.valid, true);
+});
+
 test("validateAgentDefinitionSyntax accepts a well-formed agent definition", () => {
     const result = validateAgentDefinitionSyntax(goodAgentDefinition);
     assert.equal(result.valid, true);
@@ -152,6 +188,12 @@ test("validateAgentDefinitionSyntax rejects an empty tools allowlist", () => {
 
 test("evaluateAgentDefinition returns a zero score for malformed agent definitions without calling the model", async () => {
     const evaluation = await evaluateAgentDefinition(malformedAgentDefinitionNoFrontmatter);
+    assert.equal(evaluation.score, 0);
+    assert.ok(evaluation.reasoning.length > 0);
+});
+
+test("evaluateSkillDefinition returns a zero score for malformed skill definitions without calling the model", async () => {
+    const evaluation = await evaluateSkillDefinition(goodSkillDefinition, [], "some-other-folder-name");
     assert.equal(evaluation.score, 0);
     assert.ok(evaluation.reasoning.length > 0);
 });
